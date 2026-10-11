@@ -1,0 +1,30 @@
+# Secrets: never commit real keys
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+
+# ML artifacts and local data
+*.joblib
+data/raw/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Private research (owner's trade secret) - never commit
+Validation research.pdf
+docs/specs/00-validation-research.md
+
