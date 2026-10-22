@@ -8,7 +8,16 @@ MediFlow AI is a prototype clinical workflow copilot for synthetic outpatient-cl
 2. Run `docker compose up --build`. The API container applies migrations and seeds ten demo patients on startup.
 3. Open `http://localhost:8000/docs` for the API and `http://localhost:5173` for the web shell.
 
-The API exposes `/health`, role-aware `/api/v1/context`, deterministic demo patients, approval recording, admin-only audit reads, and an LLM replay smoke endpoint. The simulated NHIS service is independent of `api/` and exposes `/health` and `/adjudicate`.
+The API exposes `/health`, role-aware `/api/v1/context`, deterministic demo patients, the recruiter-facing Scribe slice at `/api/v1/scribe/transcripts`, approval recording, admin-only audit reads, and an LLM replay smoke endpoint. The simulated NHIS service is independent of `api/` and exposes `/health` and `/adjudicate`.
+
+## Scribe demo flow
+
+1. Open the web app and select a synthetic consultation in **Notes**.
+2. Select **Generate AI draft**. The result is a deterministic replay fixture; no live LLM call is made.
+3. Edit the diagnosis, ICD-10 code, plan, or follow-up date inline. Changes are saved on blur.
+4. Select **Approve note** as the Doctor role. The API records the approval and audit event exactly once, then shows the proposed follow-up appointment/action.
+
+The API also supports `GET /api/v1/scribe/transcripts`, `GET /api/v1/scribe/transcripts/{id}`, `POST /api/v1/scribe/transcripts/{id}/generate`, `PATCH /api/v1/scribe/notes/{note_id}`, and `POST /api/v1/scribe/notes/{note_id}/approve`. To run focused tests without Docker from `api/`, use `pytest tests/test_scribe.py tests/test_foundation.py`; the normal `make test` command remains the full containerized check.
 
 To rebuild demo data after the stack is running, use `make reset-demo`. The module-specific clinical workflows, live LLM provider adapters, real authentication, and production NHIS integration remain under construction by later vertical-slice builders.
 
