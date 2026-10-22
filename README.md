@@ -1,21 +1,21 @@
 # MediFlow AI
 
-MediFlow AI is a prototype clinical workflow copilot for synthetic outpatient-clinic data. The foundation intentionally stops before implementing the six vertical modules.
+MediFlow AI is a prototype clinical workflow copilot for synthetic outpatient-clinic data. The recruiter-facing MVP combines an interactive clinic operations shell with the implemented Scribe vertical slice; the remaining modules are intentionally under construction.
 
 ## Run locally
 
 1. Copy `.env.example` to `.env` (the default replay mode never calls a live LLM).
 2. Run `docker compose up --build`. The API container applies migrations and seeds ten demo patients on startup.
-3. Open `http://localhost:8000/docs` for the API and `http://localhost:5173` for the web shell.
+3. Open `http://localhost:8000/docs` for the API and `http://localhost:5173` for the web shell. The Vite dev server proxies `/api/*` to the API container.
 
 The API exposes `/health`, role-aware `/api/v1/context`, deterministic demo patients, the recruiter-facing Scribe slice at `/api/v1/scribe/transcripts`, approval recording, admin-only audit reads, and an LLM replay smoke endpoint. The simulated NHIS service is independent of `api/` and exposes `/health` and `/adjudicate`.
 
 ## Scribe demo flow
 
-1. Open the web app and select a synthetic consultation in **Notes**.
-2. Select **Generate AI draft**. The result is a deterministic replay fixture; no live LLM call is made.
+1. Open the web app in **Overview**, then select **Consultations** (or **Follow Ama's journey**).
+2. Select a synthetic consultation and then **Generate AI draft**. The result is a deterministic replay fixture; no live LLM call is made.
 3. Edit the diagnosis, ICD-10 code, plan, or follow-up date inline. Changes are saved on blur.
-4. Select **Approve note** as the Doctor role. The API records the approval and audit event exactly once, then shows the proposed follow-up appointment/action.
+4. Select **Approve note** as the Doctor role from the role switcher. The API records the approval and audit event exactly once, then shows the proposed follow-up appointment/action. Other roles remain read-only for this action.
 
 The API also supports `GET /api/v1/scribe/transcripts`, `GET /api/v1/scribe/transcripts/{id}`, `POST /api/v1/scribe/transcripts/{id}/generate`, `PATCH /api/v1/scribe/notes/{note_id}`, and `POST /api/v1/scribe/notes/{note_id}/approve`. To run focused tests without Docker from `api/`, use `pytest tests/test_scribe.py tests/test_foundation.py`; the normal `make test` command remains the full containerized check.
 

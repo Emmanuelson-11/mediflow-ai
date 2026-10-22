@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 type IconName =
   | 'activity'
@@ -42,6 +42,28 @@ type Consultation = {
   time: string
   status: Status
   tone: 'green' | 'amber' | 'teal' | 'slate'
+}
+
+type Transcript = {
+  id: string
+  patient_name: string
+  consultation_date: string
+  clinic: string
+  status: string
+}
+
+type Note = {
+  diagnosis?: string | null
+  diagnosis_code?: string | null
+  plan?: string | null
+  follow_up_date?: string | null
+}
+
+type TranscriptDetail = Transcript & {
+  text: string
+  note: Note | null
+  generated_by: string | null
+  follow_up: { date: string; action: string; status: string; reason: string } | null
 }
 
 const roles: Role[] = ['Doctor', 'Nurse', 'Front desk', 'Billing', 'Admin']
@@ -245,6 +267,7 @@ function App() {
             </div>
 
             {active !== 'Overview' && active !== 'Consultations' && <UnderConstructionView label={active} role={role} />}
+            {active === 'Consultations' && <ScribeWorkspace role={role} />}
             <div className={active !== 'Overview' && active !== 'Consultations' ? 'dashboard-hidden' : ''}>
             {active === 'Consultations' && <div className="view-context"><span className="view-context-icon"><Icon name="clipboard" size={17} /></span><div><strong>Consultations workspace</strong><span>Review today’s masked transcripts and move the next note forward.</span></div><span className="view-context-count">10 today</span></div>}
             <section className="hero-grid">
@@ -328,6 +351,111 @@ function UnderConstructionView({ label, role }: { label: string; role: Role }) {
     <p>This clickable shell marks the workflow boundary honestly. Mock records and approvals will land here in the next build slice.</p>
     <div className="under-construction-meta"><span><Icon name="lock" size={14} /> No API calls</span><span><Icon name="file" size={14} /> Synthetic data only</span></div>
   </section>
+}
+
+function ScribeWorkspace({ role }: { role: Role }) {
+  const [transcripts, setTranscripts] = useState<Transcript[]>([])
+  const [selected, setSelected] = useState<TranscriptDetail | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const request = async <T,>(path: string, options?: RequestInit): Promise<T> => {
+    const response = await fetch(`/api/v1${path}`, {
+      headers: { 'Content-Type': 'application/json', 'X-Role': role.toLowerCase().replace(' ', '_') },
+      ...options,
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}))
+      throw new Error(body.detail ?? 'Request failed')
+    }
+    return response.json() as Promise<T>
+  }
+
+  const loadDetail = async (id: string) => {
+    setSelected(await request<TranscriptDetail>(`/scribe/transcripts/${id}`))
+  }
+
+  const loadList = async () => {
+    const result = await request<{ items: Transcript[] }>('/scribe/transcripts')
+    setTranscripts(result.items)
+    if (!selected && result.items[0]) await loadDetail(result.items[0].id)
+  }
+
+  useEffect(() => {
+    loadList().catch((error: Error) => setMessage(error.message))
+  }, [])
+
+  const generate = async () => {
+    if (!selected) return
+    setBusy(true)
+    try {
+      await request(`/scribe/transcripts/${selected.id}/generate`, { method: 'POST' })
+      await loadDetail(selected.id)
+      await loadList()
+      setMessage('AI draft generated in replay mode.')
+    } catch (error) {
+      setMessage((error as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const updateField = (field: keyof Note, value: string) => {
+    if (selected?.note) setSelected({ ...selected, note: { ...selected.note, [field]: value } })
+  }
+
+  const saveField = async (field: keyof Note, value: string) => {
+    if (!selected?.note) return
+    try {
+      await request(`/scribe/notes/note-${selected.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ fields: { [field]: value } }),
+      })
+      setMessage('Draft saved. Approval is still required.')
+    } catch (error) {
+      setMessage((error as Error).message)
+    }
+  }
+
+  const approve = async () => {
+    if (!selected?.note) return
+    setBusy(true)
+    try {
+      const result = await request<{ follow_up: TranscriptDetail['follow_up']; note: Note }>(
+        `/scribe/notes/note-${selected.id}/approve`,
+        { method: 'POST', body: JSON.stringify({ fields: selected.note }) },
+      )
+      setSelected({ ...selected, status: 'approved', note: result.note, follow_up: result.follow_up })
+      await loadList()
+      setMessage('Note approved and follow-up action proposed.')
+    } catch (error) {
+      setMessage((error as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <section className="scribe-workspace">
+    {message && <div className="scribe-notice" role="status">{message}</div>}
+    <div className="scribe-grid">
+      <div className="scribe-list surface-card">
+        <div className="card-heading card-heading-spaced"><div><span className="section-kicker">M1 · Scribe</span><h2>Consultations</h2></div><span className="live-pill"><span /> {transcripts.length} synthetic</span></div>
+        {transcripts.map((item) => <button className={`scribe-row ${selected?.id === item.id ? 'scribe-row-active' : ''}`} key={item.id} onClick={() => loadDetail(item.id)}><span><strong>{item.patient_name}</strong><small>{item.consultation_date} · {item.id}</small></span><StatusBadge status={item.status === 'approved' ? 'Approved' : item.status === 'draft' ? 'AI draft' : 'Not started'} /></button>)}
+      </div>
+      {selected && <div className="scribe-review">
+        <div className="scribe-review-head"><div><span className="section-kicker">Transcript {selected.id}</span><h2>{selected.patient_name}</h2><span className="scribe-muted">{selected.consultation_date} · {selected.clinic}</span></div><div className="scribe-actions">{!selected.note && <button className="button button-primary" onClick={generate} disabled={busy}>Generate AI draft</button>}{selected.note && selected.status !== 'approved' && <button className="button button-primary" onClick={approve} disabled={busy}>Approve note</button>}</div></div>
+        <div className="scribe-columns">
+          <article className="scribe-panel"><div className="scribe-panel-title"><strong>Source transcript</strong><span>Identity visible to clinician</span></div><p className="scribe-transcript">{selected.text}</p><div className="scribe-foot">Patient details are masked before any AI boundary.</div></article>
+          <article className="scribe-panel"><div className="scribe-panel-title"><strong>AI draft</strong><span>{selected.generated_by === 'replay' ? 'Replay fixture · scribe_v1' : 'Manual fallback'}</span></div>{selected.note ? <><ScribeField label="Diagnosis" field="diagnosis" value={selected.note.diagnosis} update={updateField} save={saveField} /><ScribeField label="ICD-10 code" field="diagnosis_code" value={selected.note.diagnosis_code} update={updateField} save={saveField} /><ScribeField label="Plan" field="plan" value={selected.note.plan} update={updateField} save={saveField} /><ScribeField label="Follow-up date" field="follow_up_date" value={selected.note.follow_up_date} update={updateField} save={saveField} /><div className="scribe-flag"><strong>Review before approval</strong><span>Every AI draft is editable and requires a clinician decision.</span></div></> : <div className="scribe-empty"><strong>Ready to generate</strong><span>Generate a deterministic synthetic draft to begin the review.</span></div>}</article>
+        </div>
+        {selected.follow_up && <div className="scribe-follow-up"><Icon name="check" size={16} /><div><strong>Follow-up appointment proposed</strong><span>{selected.follow_up.date} · {selected.follow_up.reason}</span></div><StatusBadge status="Approved" /></div>}
+      </div>}
+    </div>
+  </section>
+}
+
+function ScribeField({ label, field, value, update, save }: { label: string; field: keyof Note; value: unknown; update: (field: keyof Note, value: string) => void; save: (field: keyof Note, value: string) => void }) {
+  return <label className="scribe-field"><span>{label}<small>AI draft · click to edit</small></span><input value={value == null ? '' : String(value)} placeholder="Not captured" onChange={(event) => update(field, event.target.value)} onBlur={(event) => save(field, event.target.value)} /></label>
 }
 
 export default App
