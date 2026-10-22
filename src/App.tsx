@@ -244,6 +244,9 @@ function App() {
               </div>
             </div>
 
+            {active !== 'Overview' && active !== 'Consultations' && <UnderConstructionView label={active} role={role} />}
+            <div className={active !== 'Overview' && active !== 'Consultations' ? 'dashboard-hidden' : ''}>
+            {active === 'Consultations' && <div className="view-context"><span className="view-context-icon"><Icon name="clipboard" size={17} /></span><div><strong>Consultations workspace</strong><span>Review today’s masked transcripts and move the next note forward.</span></div><span className="view-context-count">10 today</span></div>}
             <section className="hero-grid">
               <div className="hero-card">
                 <div className="hero-card-top">
@@ -297,6 +300,7 @@ function App() {
             </section>
 
             <footer className="page-footer"><span>© 2024 MediFlow AI <span className="footer-dot">·</span> Prototype workspace</span><span><Icon name="lock" size={13} /> Built for safe, human-led care operations</span></footer>
+            </div>
           </div>
         </main>
       </div>
@@ -314,6 +318,16 @@ function MetricCard({ label, value, detail, icon, accent }: { label: string; val
 
 function TrustRow({ icon, title, detail, status }: { icon: IconName; title: string; detail: string; status: string }) {
   return <div className="trust-row"><span className="trust-icon"><Icon name={icon} size={16} /></span><div><strong>{title}</strong><p>{detail}</p></div><span className="trust-status"><Icon name="check" size={13} /> {status}</span></div>
+}
+
+function UnderConstructionView({ label, role }: { label: string; role: Role }) {
+  return <section className="under-construction">
+    <span className="under-construction-icon"><Icon name="spark" size={22} /></span>
+    <span className="section-kicker">MVP preview · {role} view</span>
+    <h2>{label} is under construction</h2>
+    <p>This clickable shell marks the workflow boundary honestly. Mock records and approvals will land here in the next build slice.</p>
+    <div className="under-construction-meta"><span><Icon name="lock" size={14} /> No API calls</span><span><Icon name="file" size={14} /> Synthetic data only</span></div>
+  </section>
 }
 
 export default App
