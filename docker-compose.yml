@@ -1,0 +1,33 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: mediflow
+      POSTGRES_USER: mediflow
+      POSTGRES_PASSWORD: mediflow
+    ports: ["5432:5432"]
+    volumes: [mediflow-db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediflow -d mediflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  api:
+    build: {context: ., dockerfile: Dockerfile.api}
+    environment:
+      DATABASE_URL: postgresql+psycopg://mediflow:mediflow@db:5432/mediflow
+      LLM_MODE: replay
+      DEMO_MODE: "true"
+      SIM_NHIS_URL: http://sim_nhis:8001
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["8000:8000"]
+  web:
+    build: {context: ., dockerfile: Dockerfile.web}
+    depends_on: [api]
+    ports: ["5173:5173"]
+  sim_nhis:
+    build: {context: ., dockerfile: Dockerfile.sim_nhis}
+    ports: ["8001:8001"]
+volumes:
+  mediflow-db:
