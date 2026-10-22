@@ -55,3 +55,32 @@ class LLMSpend(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class Transcript(Base):
+    __tablename__ = "transcripts"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    patient_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    patient_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    phone: Mapped[str] = mapped_column(String(40), nullable=False)
+    nhis_number: Mapped[str] = mapped_column(String(40), nullable=False)
+    consultation_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    clinic: Mapped[str] = mapped_column(String(160), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class ScribeNote(Base):
+    __tablename__ = "scribe_notes"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    transcript_id: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="none")
+    note_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    generated_by: Mapped[str] = mapped_column(String(40), nullable=False, default="replay")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
